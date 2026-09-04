@@ -1,6 +1,5 @@
 def dominates(p, q):
-    """Returns True if point p dominates point q."""
-    # p dominates q if p_i <= q_i for all i and p_i < q_i for at least one i
+    """Retorna True si el punto p domina al punto q."""
     is_better_or_equal = True
     is_strictly_better = False
 
@@ -16,7 +15,7 @@ def dominates(p, q):
 
 def alg1(points):
     """
-    Naive algorithm to find the Pareto Front (Skyline).
+    Algoritmo simple para encontrar la frontera Pareto (skyline)
     Complexity: O(n^2)
     """
     pareto_front = []
@@ -40,8 +39,8 @@ def alg1(points):
 
 def alg2_arreglo(points):
     """
-    Incremental algorithm using an array for the Pareto Front candidates.
-    Worst case: O(n^2), but better in practice.
+    Algoritmo incremental usando array para encontrar los candiadatos de la frontera pareto
+    Worst case: O(n^2), pero mejor en practica.
     """
     C = []
     for p in points:
@@ -55,7 +54,7 @@ def alg2_arreglo(points):
                 to_remove.append(q)
 
         if not is_p_dominated:
-            # Remove all q in C that p dominates
+            # Eliminar todos q en C que domina p
             for item in to_remove:
                 C.remove(item)
             C.append(p)
@@ -64,24 +63,24 @@ def alg2_arreglo(points):
 
 def alg3_mi_estructura(points):
     """
-    Optimized algorithm (2D case).
-    Sort by X ascending, then by Y ascending.
-    Keep track of the minimum Y found so far.
-    Complexity: O(n log n) due to sorting.
+    Algoritmo optimizado (Caso 2D)
+    Ordena asendentemente por X, y luego por Y.
+    Guardar el minimo en Y hasta el momento
+    Complexity: O(n log n) Dado el ordenamiento.
     """
     if not points:
         return []
 
-    # Sort primarily by X (asc), then by Y (asc)
+    # Ordena por X (asc), luego por Y (asc)
     sorted_points = sorted(points, key=lambda x: (x[0], x[1]))
 
     pareto_front = []
     min_y = float("inf")
 
     for p in sorted_points:
-        # Since points are sorted by X, we only need to check if Y is strictly better
-        # than the best Y seen so far to not be dominated.
-        # Note: If multiple points have same X, only the first (with smallest Y) can be in Pareto.
+        # Dado que los puntos estan ordenados por X, solo necesitamos que Y sea estrictamente mejor
+        # que el mejor Y hasta el momento no sea dominado
+        # Nota: si varios valores tienen el mismo valor de X, el con menor Y puede estar en la frontera Pareto
         if p[1] < min_y:
             pareto_front.append(p)
             min_y = p[1]
