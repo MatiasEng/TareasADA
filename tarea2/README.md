@@ -6,8 +6,8 @@
 git clone <repo-url>
 cd tarea2
 
-# 1. Crear entorno virtual (recomendado)
-python3 -m venv venv
+# 1. Crear entorno virtual 
+python -m venv venv
 source venv/bin/activate   # Linux/macOS
 # venv\Scripts\activate    # Windows
 
@@ -15,7 +15,7 @@ source venv/bin/activate   # Linux/macOS
 pip install -r requirements.txt
 
 # 3. Verificar que el algoritmo funciona
-python3 src/test_rdp.py
+python src/test_rdp.py
 ```
 
 ## Estructura del proyecto
@@ -42,7 +42,7 @@ tarea2/
 
 ### 1. Tests de corrección + experimento simple
 ```bash
-python3 src/test_rdp.py
+python src/test_rdp.py
 ```
 - Verifica el ejemplo del enunciado (Figura 1)
 - Corre 6 epsilons × 6 tamaños (si existen archivos en `puntos/`)
@@ -50,7 +50,7 @@ python3 src/test_rdp.py
 
 ### 2. Experimento estadístico (múltiples muestras)
 ```bash
-python3 src/experimentos.py
+python src/experimentos.py
 ```
 - Crea `data/try_N/data.csv` con N_SAMPLES=5 por (n, ε)
 - Total: 6 tamaños × 6 ε × 5 samples = 180 corridas
@@ -58,17 +58,24 @@ python3 src/experimentos.py
 
 ### 3. Generar gráficos
 ```bash
-python3 src/graficar.py data/try_1/data.csv
+python src/graficar.py data/try_1/data.csv
 ```
 - Crea 6 PNG en `data/try_1/graficos/` (uno por ε)
 - Scatter de samples + media ± std (log-log)
 
 ### 4. Generar trayectorías sintéticas (para `puntos/`)
 ```bash
-python3 src/generar_trayectorias.py
+python src/generar_trayectorias.py
 ```
 - Llena `puntos/trayectoria_1000.txt` ... `trayectoria_50000.txt`
 - Reemplazar por archivos oficiales del curso cuando estén disponibles
+
+### 5. Para generar un nuevo try con graficos y datos 
+```bash
+python src/run.py
+```
+- Genera un nuevo try con graficos y datos
+- Si ya existe el try_X creara el try_X+1 
 
 ## Configuración clave (`src/experimentos.py`)
 
