@@ -1,0 +1,18 @@
+# Entorno virtual
+venv/
+.env/
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Resultados de experimentos (opcional: comenta si quieres versionarlos)
+# data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
