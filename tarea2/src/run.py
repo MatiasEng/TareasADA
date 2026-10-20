@@ -9,47 +9,41 @@ Modos de ejecución:
   python run.py --test         Ejecutar pruebas de corrección (test_rdp.py)
   python run.py --generar      Generar archivos de trayectorias (generar_trayectorias.py)
 """
-
 import subprocess
 import sys
 from pathlib import Path
 
 
+# Añadir el directorio padre al path para imports relativos
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+
 def run_experimentos():
-    """Ejecuta la funcionalidad de experimentos.py"""
-    result = subprocess.run(
-        [sys.executable, "experimentos.py"],
-        cwd=Path(__file__).parent,
-        text=True,
-    )
-    return result.returncode
+    """Ejecuta experimentos.py directamente"""
+    from src import experimentos
+    experimentos.correr_experimentos()
+    return 0
 
 
 def run_graficar(csv_path: Path):
-    """Ejecuta la funcionalidad de graficar.py"""
-    result = subprocess.run(
-        [sys.executable, "graficar.py", str(csv_path)],
-        cwd=Path(__file__).parent,
-        text=True,
-    )
-    return result.returncode
+    """Ejecuta graficar.py directamente"""
+    from src import graficar
+    graficar.graficar(csv_path)
+    return 0
 
 
 def run_test():
-    """Ejecuta las pruebas de corrección"""
-    result = subprocess.run(
-        [sys.executable, "test_rdp.py"],
-        cwd=Path(__file__).parent,
-        text=True,
-    )
-    return result.returncode
+    """Ejecuta test_rdp.py directamente. Retorna 0 si todo pasa, 1 si falla."""
+    from src import test_rdp
+    return 0 if test_rdp.comprobaciones() else 1
 
 
 def run_generar():
-    """Genera archivos de trayectorias"""
+    """Ejecuta generar_trayectorias.py como subprocess"""
     result = subprocess.run(
         [sys.executable, "generar_trayectorias.py"],
-        cwd=Path(__file__).parent,
+        cwd=PROJECT_ROOT / "src",
         text=True,
     )
     return result.returncode
@@ -59,15 +53,13 @@ def main():
     args = sys.argv[1:]
 
     if not args:
-        # Modo por defecto: experimentos + graficar automáticamente
         print("=== Modo completo: experimentos + graficar ===")
         rc = run_experimentos()
         if rc != 0:
             print("Error en los experimentos")
             sys.exit(rc)
 
-        # Buscar el CSV más reciente generado
-        DATA_ROOT = Path(__file__).parent.parent / "data"
+        DATA_ROOT = PROJECT_ROOT / "data"
         try_dirs = sorted(
             [d for d in DATA_ROOT.iterdir() if d.is_dir() and d.name.startswith("try_")]
         )
@@ -84,7 +76,7 @@ def main():
         else:
             print("No se encontraron directorios de experiencia")
     elif args[0] == "--experimentos":
-        print("=== Ejecutando experimentos ---")
+        print("=== Ejecutando experimentos ===")
         sys.exit(run_experimentos())
     elif args[0] == "--graficar":
         if len(args) < 2:
@@ -94,13 +86,13 @@ def main():
         if not csv_path.exists():
             print(f"Archivo no encontrado: {csv_path}")
             sys.exit(1)
-        print("=== Generando gráfico ---")
+        print("=== Generando gráfico ===")
         sys.exit(run_graficar(csv_path))
     elif args[0] == "--test":
-        print("=== Ejecutando pruebas ---")
+        print("=== Ejecutando pruebas ===")
         sys.exit(run_test())
     elif args[0] == "--generar":
-        print("=== Generando trayectorias ---")
+        print("=== Generando trayectorias ===")
         sys.exit(run_generar())
     else:
         print(f"Argumento desconocido: {args[0]}")

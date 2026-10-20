@@ -37,23 +37,13 @@ def siguiente_try_dir() -> Path:
 
 def medir_una(trayectoria, epsilon):
     inicio = time.perf_counter()
-    simplificada = rdp.ramer_douglas_peucker(trayectoria, epsilon)
+    # Se mide el núcleo del algoritmo; ramer_douglas_peucker es un wrapper
+    # O(k) que sólo mapea los índices conservados a puntos.
+    indices = rdp.rdp_indices(trayectoria, epsilon)
     fin = time.perf_counter()
 
-    indices = []
-    j = 0
-    for i, p in enumerate(trayectoria):
-        if j < len(simplificada) and p == simplificada[j]:
-            indices.append(i)
-            j += 1
-
-    max_d = 0.0
-    for k in range(len(indices) - 1):
-        a, b = indices[k], indices[k + 1]
-        for i in range(a, b + 1):
-            dist = rdp.calcular_distancia_perpendicular(trayectoria[i], trayectoria[a], trayectoria[b])
-            if dist > max_d:
-                max_d = dist
+    simplificada = [trayectoria[i] for i in indices]
+    max_d = rdp.desviacion_maxima(trayectoria, indices)
 
     return {
         "tiempo_s": fin - inicio,
@@ -92,11 +82,14 @@ def correr_experimentos():
         done = 0
 
         for n in TAMANOS:
-            for eps in EPSILONS:
-                for sample in range(1, N_SAMPLES + 1):
-                    semilla = sample * 100000 + n * 10 + EPSILONS.index(eps)
-                    trayectoria = gt.generar_trayectoria(n, semilla)
+            for sample in range(1, N_SAMPLES + 1):
+                # La semilla depende sólo de (n, sample): la MISMA trayectoria
+                # se usa para todos los ε (diseño pareado), así la comparación
+                # de tiempos entre ε es justa. Se genera una sola vez.
+                semilla = sample * 100000 + n
+                trayectoria = gt.generar_trayectoria(n, semilla)
 
+                for eps in EPSILONS:
                     m = medir_una(trayectoria, eps)
                     row = {
                         "try_id": try_dir.name,

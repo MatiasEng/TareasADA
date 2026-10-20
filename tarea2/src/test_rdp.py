@@ -33,19 +33,6 @@ def leer_puntos(archivo: str) -> List[Tuple[float, float]]:
     return puntos
 
 
-def desviacion_maxima(original: List[Tuple[float, float]], indices: List[int]) -> float:
-    """Máxima distancia perpendicular de un punto descartado a su segmento
-    de la trayectoria simplificada. Debe ser <= epsilon."""
-    max_d = 0.0
-    for k in range(len(indices) - 1):
-        a, b = indices[k], indices[k + 1]
-        for i in range(a, b + 1):
-            dist = rdp.calcular_distancia_perpendicular(original[i], original[a], original[b])
-            if dist > max_d:
-                max_d = dist
-    return max_d
-
-
 def medir_performance(
     trayectoria: List[Tuple[float, float]],
     epsilons: List[float], 
@@ -64,17 +51,13 @@ def medir_performance(
           f"{'simplificación':>15} {'desv. máx':>10}")
     for epsilon in epsilons:
         inicio = time.perf_counter()
-        trayectoria_simplificada = rdp.ramer_douglas_peucker(trayectoria, epsilon)
+        # Se mide el núcleo del algoritmo; ramer_douglas_peucker es un wrapper
+        # O(k) que sólo mapea los índices conservados a puntos.
+        indices = rdp.rdp_indices(trayectoria, epsilon)
         fin = time.perf_counter()
 
-        # Índices de los puntos conservados (para validar la desviación)
-        indices = []
-        j = 0
-        for i, p in enumerate(trayectoria):
-            if j < len(trayectoria_simplificada) and p == trayectoria_simplificada[j]:
-                indices.append(i)
-                j += 1
-        desv = desviacion_maxima(trayectoria, indices)
+        trayectoria_simplificada = [trayectoria[i] for i in indices]
+        desv = rdp.desviacion_maxima(trayectoria, indices)
 
         puntos_eliminados = len(trayectoria) - len(trayectoria_simplificada)
         porcentaje_simplificacion = 100.0 * puntos_eliminados / len(trayectoria)
@@ -135,8 +118,8 @@ def comprobaciones() -> bool:
               rdp.ramer_douglas_peucker([(1, 2)], 0.5) == [(1, 2)])
 
     # 5. Ningún punto descartado queda a más de ε de la línea simplificada
-    indices = rdp._indices_rdp(T, 0.5)
-    desv = desviacion_maxima(T, indices)
+    indices = rdp.rdp_indices(T, 0.5)
+    desv = rdp.desviacion_maxima(T, indices)
     verificar(f"Desviación máxima ≤ ε en el enunciado (desv: {desv:.4f}, ε: 0.5)",
               desv <= 0.5)
 
@@ -144,6 +127,18 @@ def comprobaciones() -> bool:
     res_cero = rdp.ramer_douglas_peucker(T, 0.0)
     verificar("ε=0 conserva al menos los extremos y P4",
               res_cero[0] == (0, 0) and res_cero[-1] == (7, 6) and (4, 6.1) in res_cero)
+
+    # 7. Puntos repetidos: los índices se calculan directamente (no por valor),
+    #    así que no se confunden duplicados.
+    repetidos = [(2, 1), (0, 2), (0, 1), (0, 1)]
+    idx_rep = rdp.rdp_indices(repetidos, 1.0)
+    verificar("Puntos repetidos: índices correctos (0, 3)",
+              idx_rep == [0, 3])
+
+    # 8. La distancia es al segmento, no a la recta infinita
+    dist_segmento = rdp.calcular_distancia_perpendicular((10.001, -5.0), (0.0, 0.0), (10.0, 0.0))
+    verificar(f"Distancia al segmento (no a la recta): {dist_segmento:.4f} > 5",
+              dist_segmento > 5.0)
 
     print()
     return ok
