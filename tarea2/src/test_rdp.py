@@ -1,45 +1,84 @@
 # Import necessary libraries
 import csv
+import math
 import os
+import random
 import time
 from typing import List, Tuple
 
 import rdp
+import trayectorias
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PUNTOS_DIR = os.path.join(BASE_DIR, "puntos")
 RUTA_CSV = os.path.join(BASE_DIR, "resultados.csv")
 
 EPSILONS = [0.001, 0.01, 0.1, 0.5, 1.0, 10.0]
-TAMANOS = [1000, 5000, 10000, 20000, 30000, 50000]
 
 
-def leer_puntos(archivo: str) -> List[Tuple[float, float]]:
-    """Lee los puntos desde un archivo (formato: x y o x,y por línea)."""
-    puntos: List[Tuple[float, float]] = []
-    with open(archivo, "r") as file:
-        for linea in file:
-            linea = linea.strip().replace(",", " ")
-            if not linea:
-                continue
-            valores = linea.split()
-            if len(valores) < 2:
-                continue
-            try:
-                x, y = float(valores[0]), float(valores[1])
-            except ValueError:
-                continue  # encabezado u otra línea no numérica
-            puntos.append((x, y))
-    return puntos
+# ---------------------------------------------------------------------------
+# Validador independiente
+# ---------------------------------------------------------------------------
+# No reutiliza rdp.calcular_distancia_perpendicular: usa otra fórmula
+# (área del triángulo + recorte por producto punto) para que un error en la
+# métrica del algoritmo no pase desapercibido.
+
+def _distancia_segmento_independiente(
+    p: Tuple[float, float],
+    a: Tuple[float, float],
+    b: Tuple[float, float],
+) -> float:
+    ax, ay = a
+    bx, by = b
+    px, py = p
+    dx, dy = bx - ax, by - ay
+    largo2 = dx * dx + dy * dy
+
+    if largo2 == 0.0:
+        return math.hypot(px - ax, py - ay)
+
+    # ¿La proyección cae antes de a, después de b, o dentro?
+    proyeccion = (px - ax) * dx + (py - ay) * dy
+    if proyeccion <= 0.0:
+        return math.hypot(px - ax, py - ay)
+    if proyeccion >= largo2:
+        return math.hypot(px - bx, py - by)
+
+    # Distancia por área: |cross| / |b - a|
+    area2 = abs(dx * (py - ay) - dy * (px - ax))
+    return area2 / math.sqrt(largo2)
+
+
+def desviacion_polilinea(
+    original: List[Tuple[float, float]],
+    simplificada: List[Tuple[float, float]],
+) -> float:
+    """Máxima distancia de cada punto original a la polilínea simplificada.
+
+    Es una verificación más fuerte que la del algoritmo: calcula el mínimo
+    sobre TODOS los segmentos simplificados, con una implementación
+    independiente.
+    """
+    if len(simplificada) < 2:
+        return 0.0
+
+    max_d = 0.0
+    for p in original:
+        d = min(
+            _distancia_segmento_independiente(p, simplificada[k], simplificada[k + 1])
+            for k in range(len(simplificada) - 1)
+        )
+        if d > max_d:
+            max_d = d
+    return max_d
 
 
 def medir_performance(
     trayectoria: List[Tuple[float, float]],
-    epsilons: List[float], 
+    epsilons: List[float],
     nombre: str = "",
 ) -> List[dict]:
-    """Mide el tiempo de ejecución, puntos eliminados, % de simplificación
-    y la desviación máxima (para verificar que es <= epsilon)."""
+    """Mide tiempo, puntos eliminados, % de simplificación y desviación máxima."""
     filas = []
     if nombre:
         print(f"=== {nombre} ({len(trayectoria)} puntos) ===")
@@ -59,14 +98,24 @@ def medir_performance(
         trayectoria_simplificada = [trayectoria[i] for i in indices]
         desv = rdp.desviacion_maxima(trayectoria, indices)
 
+        # Verificación independiente para tamaños manejables (otra fórmula y
+        # distancia mínima contra TODA la polilínea, no sólo el segmento padre).
+        desv_ind = None
+        if len(trayectoria) <= 2000:
+            desv_ind = desviacion_polilinea(trayectoria, trayectoria_simplificada)
+
         puntos_eliminados = len(trayectoria) - len(trayectoria_simplificada)
         porcentaje_simplificacion = 100.0 * puntos_eliminados / len(trayectoria)
         tiempo = fin - inicio
 
-        estado = "OK" if desv <= epsilon + 1e-9 else "FAIL"
+        valido = desv <= epsilon + 1e-9
+        if desv_ind is not None and desv_ind > epsilon + 1e-9:
+            valido = False
+        estado = "OK" if valido else "FAIL"
+        extra = f" indep={desv_ind:.4f}" if desv_ind is not None else ""
         print(f"{epsilon:>8} {tiempo:>12.4f} {len(trayectoria_simplificada):>12} "
               f"{puntos_eliminados:>11} {porcentaje_simplificacion:>14.2f}% "
-              f"{desv:>10.4f} {estado}")
+              f"{desv:>10.4f} {estado}{extra}")
 
         filas.append({
             "archivo": nombre,
@@ -140,6 +189,25 @@ def comprobaciones() -> bool:
     verificar(f"Distancia al segmento (no a la recta): {dist_segmento:.4f} > 5",
               dist_segmento > 5.0)
 
+    # 9. Validación independiente sobre el ejemplo del enunciado
+    desv_ind = desviacion_polilinea(T, res)
+    verificar(f"Validador independiente ≤ ε en el enunciado (desv: {desv_ind:.4f})",
+              desv_ind <= 0.5 + 1e-9)
+
+    # 10. Validación independiente sobre una trayectoria aleatoria
+    rng = random.Random(123)
+    T_rand = [(rng.uniform(0, 10), rng.uniform(0, 10)) for _ in range(300)]
+    validos = True
+    detalle = []
+    for eps in (0.1, 0.5, 1.0, 2.0):
+        simpl = rdp.ramer_douglas_peucker(T_rand, eps)
+        d = desviacion_polilinea(T_rand, simpl)
+        detalle.append(f"ε={eps}:{d:.4f}")
+        if d > eps + 1e-9 or len(simpl) >= len(T_rand):
+            validos = False
+    verificar(f"Validador independiente ≤ ε (con puntos eliminados) ({', '.join(detalle)})",
+              validos)
+
     print()
     return ok
 
@@ -148,14 +216,17 @@ if __name__ == "__main__":
     if not comprobaciones():
         raise SystemExit("Fallaron las comprobaciones de corrección.")
 
+    archivos = trayectorias.descubrir_trayectorias(PUNTOS_DIR)
+    if not archivos:
+        print(f"AVISO: no se encontraron trayectorias (.txt/.csv) en {PUNTOS_DIR}\n")
+
     filas_total = []
-    for tamano in TAMANOS:
-        archivo = os.path.join(PUNTOS_DIR, f"trayectoria_{tamano}.txt")
-        if not os.path.exists(archivo) or os.path.getsize(archivo) == 0:
-            print(f"AVISO: {archivo} no existe o está vacío, se omite.\n")
+    for _, ruta, trayectoria in archivos:
+        nombre = os.path.basename(ruta)
+        if not trayectoria:
+            print(f"AVISO: {nombre} está vacío o sin puntos válidos, se omite.\n")
             continue
-        trayectoria = leer_puntos(archivo)
-        filas_total.extend(medir_performance(trayectoria, EPSILONS, os.path.basename(archivo)))
+        filas_total.extend(medir_performance(trayectoria, EPSILONS, nombre))
         print("=" * 80 + "\n")
 
     if filas_total:
@@ -164,5 +235,3 @@ if __name__ == "__main__":
             escritor.writeheader()
             escritor.writerows(filas_total)
         print(f"Resultados guardados en {RUTA_CSV}")
-
-

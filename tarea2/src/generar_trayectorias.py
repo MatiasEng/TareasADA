@@ -23,11 +23,17 @@ def guardar(puntos, ruta: str) -> None:
 
 if __name__ == "__main__":
     import os
+    import sys
+
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     PUNTOS_DIR = os.path.join(BASE_DIR, "puntos")
     TAMANOS = [1000, 5000, 10000, 20000, 30000, 50000]
+    forzar = "--force" in sys.argv[1:]
     os.makedirs(PUNTOS_DIR, exist_ok=True)
     for tamano in TAMANOS:
         ruta = os.path.join(PUNTOS_DIR, f"trayectoria_{tamano}.txt")
+        if os.path.exists(ruta) and not forzar:
+            print(f"Existe, se omite: {ruta} (usa --force para sobrescribir)")
+            continue
         guardar(generar_trayectoria(tamano), ruta)
         print(f"Generado: {ruta} ({tamano} puntos)")

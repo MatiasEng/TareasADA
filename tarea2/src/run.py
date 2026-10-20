@@ -8,15 +8,18 @@ Modos de ejecución:
   python run.py --graficar <csv>  Solo generar gráfico desde un CSV
   python run.py --test         Ejecutar pruebas de corrección (test_rdp.py)
   python run.py --generar      Generar archivos de trayectorias (generar_trayectorias.py)
+  python run.py --complejidad  Evidencia empírica mejor/promedio/peor caso
 """
 import subprocess
 import sys
 from pathlib import Path
 
 
-# Añadir el directorio padre al path para imports relativos
+# Añadir el proyecto (y src/) al path para imports directos y `python -m src.run`
 PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+for _ruta in (PROJECT_ROOT / "src", PROJECT_ROOT):
+    if str(_ruta) not in sys.path:
+        sys.path.insert(0, str(_ruta))
 
 
 def run_experimentos():
@@ -49,6 +52,21 @@ def run_generar():
     return result.returncode
 
 
+def run_complejidad():
+    """Ejecuta complejidad.py (conteo de evaluaciones y profundidad)."""
+    from src import complejidad
+    complejidad.main()
+    return 0
+
+
+def _numero_try(directorio: Path) -> int:
+    """Extrae el número de `try_N` (orden numérico, no lexicográfico)."""
+    try:
+        return int(directorio.name.rsplit("_", 1)[1])
+    except (IndexError, ValueError):
+        return -1
+
+
 def main():
     args = sys.argv[1:]
 
@@ -62,9 +80,10 @@ def main():
         DATA_ROOT = PROJECT_ROOT / "data"
         try_dirs = sorted(
             [d for d in DATA_ROOT.iterdir() if d.is_dir() and d.name.startswith("try_")]
-        )
+        ) if DATA_ROOT.exists() else []
         if try_dirs:
-            csv_path = try_dirs[-1] / "data.csv"
+            # Orden numérico: try_9 < try_10 < try_11
+            csv_path = max(try_dirs, key=_numero_try) / "data.csv"
             if csv_path.exists():
                 print("\n--- Generando gráfico ---")
                 rc2 = run_graficar(csv_path)
@@ -94,9 +113,12 @@ def main():
     elif args[0] == "--generar":
         print("=== Generando trayectorias ===")
         sys.exit(run_generar())
+    elif args[0] == "--complejidad":
+        print("=== Experimento de complejidad ===")
+        sys.exit(run_complejidad())
     else:
         print(f"Argumento desconocido: {args[0]}")
-        print("Modos disponibles: --experimentos, --graficar, --test, --generar")
+        print("Modos disponibles: --experimentos, --graficar, --test, --generar, --complejidad")
         sys.exit(1)
 
 

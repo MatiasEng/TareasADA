@@ -1,6 +1,6 @@
 """Implementación del algoritmo Ramer–Douglas–Peucker para simplificar trayectorias."""
 import math
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 Punto = Tuple[float, float]
 
@@ -39,21 +39,40 @@ def calcular_distancia_perpendicular(punto: Punto, punto1: Punto, punto2: Punto)
     return math.hypot(x - proy_x, y - proy_y)
 
 
-def rdp_indices(trayectoria: List[Punto], epsilon: float) -> List[int]:
+def rdp_indices(
+    trayectoria: List[Punto],
+    epsilon: float,
+    stats: Optional[Dict[str, int]] = None,
+) -> List[int]:
     """Retorna los índices de los puntos que RDP conserva (divide para reinar).
 
     Se usa una pila explícita en lugar de recursión porque la profundidad de
     dividir puede ser O(n) en el peor caso (límite de recursión de Python).
+
+    Si se entrega `stats` (dict), se instrumenta con:
+      - "evaluaciones": distancias punto-segmento calculadas
+      - "llamadas": subproblemas procesados
+      - "profundidad": profundidad máxima de división (segmentos anidados)
     """
     n = len(trayectoria)
+    if stats is not None:
+        stats["evaluaciones"] = 0
+        stats["llamadas"] = 0
+        stats["profundidad"] = 0
+
     if n <= 2:
         return list(range(n))
 
     conservados = {0, n - 1}
-    pila = [(0, n - 1)]
+    pila = [(0, n - 1, 1)]
 
     while pila:
-        inicio, fin = pila.pop()
+        inicio, fin, profundidad = pila.pop()
+
+        if stats is not None:
+            stats["llamadas"] += 1
+            if profundidad > stats["profundidad"]:
+                stats["profundidad"] = profundidad
 
         # Base: no hay puntos intermedios que evaluar
         if fin - inicio < 2:
@@ -66,6 +85,8 @@ def rdp_indices(trayectoria: List[Punto], epsilon: float) -> List[int]:
             dist = calcular_distancia_perpendicular(
                 trayectoria[i], trayectoria[inicio], trayectoria[fin]
             )
+            if stats is not None:
+                stats["evaluaciones"] += 1
             if dist > max_dist:
                 max_dist = dist
                 indice = i
@@ -73,8 +94,8 @@ def rdp_indices(trayectoria: List[Punto], epsilon: float) -> List[int]:
         # Si la distancia máxima es mayor que epsilon, Q se conserva y se divide
         if indice != -1 and max_dist > epsilon:
             conservados.add(indice)
-            pila.append((inicio, indice))
-            pila.append((indice, fin))
+            pila.append((inicio, indice, profundidad + 1))
+            pila.append((indice, fin, profundidad + 1))
 
     return sorted(conservados)
 
@@ -90,7 +111,7 @@ def ramer_douglas_peucker(trayectoria: List[Punto], epsilon: float) -> List[Punt
     queda a más de epsilon del segmento simplificado correspondiente.
     """
     if len(trayectoria) < 3:
-        return trayectoria
+        return list(trayectoria)
 
     return [trayectoria[i] for i in rdp_indices(trayectoria, epsilon)]
 

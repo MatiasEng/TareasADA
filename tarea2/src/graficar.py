@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """
-Genera solo el gráfico comparativo T vs n (escala lineal en Y, log en X)
-con ejes X legibles.
+Genera los gráficos del experimento y una tabla resumen.
+
+Salidas en <try>/graficos/:
+  - T_vs_n_comparativo_eps.png           tiempo vs n (una curva por ε)
+  - simplificacion_vs_n_comparativo_eps.png   % simplificación vs n
+  - eliminados_vs_n_comparativo_eps.png       puntos eliminados vs n
+
+Además escribe <try>/resumen.csv con media/desv. estándar por (n, ε).
+
+Los valores de n y ε se detectan desde el CSV (no se hardcodean), así funciona
+tanto con trayectorias sintéticas como con los archivos oficiales.
+
 Uso: python3 src/graficar.py data/try_1/data.csv
 """
 import sys
@@ -13,52 +23,102 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import pandas as pd
 
-EPSILONS = [0.001, 0.01, 0.1, 0.5, 1.0, 10.0]
-COLORES = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
-TAMANOS = [1000, 5000, 10000, 20000, 30000, 50000]
+PALETA = plt.get_cmap("tab10")
+
+
+def _configurar_eje_x(ax, n_values):
+    """Escala log en X con ticks legibles (sólo si no son demasiados)."""
+    ax.set_xscale("log")
+    if 0 < len(n_values) <= 10:
+        ax.set_xticks(n_values)
+        ax.set_xticklabels([f"{int(n):,}".replace(",", ".") for n in n_values])
+        ax.xaxis.set_minor_locator(mticker.NullLocator())
+
+
+def _graficar_por_epsilon(df, columna, ylabel, titulo, out_path):
+    """Una curva por ε: media de `columna` en función de n."""
+    eps_values = sorted(df["epsilon"].dropna().unique())
+    n_values = sorted(df["n"].dropna().unique())
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for i, eps in enumerate(eps_values):
+        sub = df[df["epsilon"] == eps]
+        if sub.empty:
+            continue
+        stats = sub.groupby("n")[columna].mean()
+        ax.plot(stats.index, stats.values, "o-", color=PALETA(i % 10), linewidth=2,
+                label=f"ε = {eps:g}", markersize=6)
+
+    ax.set_xlabel("Número de puntos (n)", fontsize=12)
+    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_title(titulo, fontsize=13)
+    _configurar_eje_x(ax, n_values)
+
+    ax.grid(True, which="major", ls=":", alpha=0.5, axis="both")
+    ax.set_axisbelow(True)
+    ax.legend(fontsize=11, title="Tolerancia ε", title_fontsize=11)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=200)
+    plt.close(fig)
+
+
+def _escribir_resumen(df, out_path):
+    """Tabla media/desv. estándar por (n, ε) para el informe."""
+    resumen = (
+        df.groupby(["n", "epsilon"])
+        .agg(
+            muestras=("tiempo_s", "size"),
+            tiempo_media=("tiempo_s", "mean"),
+            tiempo_std=("tiempo_s", "std"),
+            conservados_media=("conservados", "mean"),
+            eliminados_media=("eliminados", "mean"),
+            simplificacion_media=("simplificacion_pct", "mean"),
+            simplificacion_std=("simplificacion_pct", "std"),
+            desviacion_max=("desviacion_max", "max"),
+        )
+        .reset_index()
+    )
+    resumen["tiempo_std"] = resumen["tiempo_std"].fillna(0.0)
+    resumen["simplificacion_std"] = resumen["simplificacion_std"].fillna(0.0)
+    resumen.to_csv(out_path, index=False)
+    return resumen
 
 
 def graficar(csv_path: Path):
     df = pd.read_csv(csv_path)
     try_dir = csv_path.parent
     graficos_dir = try_dir / "graficos"
-    graficos_dir.mkdir(exist_ok=True)
+    graficos_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Leyendo {csv_path} ({len(df)} filas)")
 
-    # === Solo: T vs n (LINEAL en Y, LOG en X) - todas las ε ===
-    fig, ax = plt.subplots(figsize=(10, 6))
+    if "valido" in df.columns and not df["valido"].all():
+        print("AVISO: hay filas con validación FAIL (desviación > ε).")
 
-    for i, eps in enumerate(EPSILONS):
-        sub = df[df["epsilon"] == eps]
-        if sub.empty:
-            continue
-        stats = sub.groupby("n")["tiempo_s"].mean().reset_index()
-        ax.plot(stats["n"], stats["tiempo_s"], "o-", color=COLORES[i], linewidth=2,
-                label=f"ε = {eps}", markersize=6)
+    _graficar_por_epsilon(
+        df, "tiempo_s",
+        "Tiempo medio de ejecución (s)",
+        "RDP: Tiempo de ejecución vs n — comparación de ε",
+        graficos_dir / "T_vs_n_comparativo_eps.png",
+    )
+    _graficar_por_epsilon(
+        df, "simplificacion_pct",
+        "Simplificación media (%)",
+        "RDP: Porcentaje de simplificación vs n — comparación de ε",
+        graficos_dir / "simplificacion_vs_n_comparativo_eps.png",
+    )
+    _graficar_por_epsilon(
+        df, "eliminados",
+        "Puntos eliminados (media)",
+        "RDP: Puntos eliminados vs n — comparación de ε",
+        graficos_dir / "eliminados_vs_n_comparativo_eps.png",
+    )
 
-    ax.set_xlabel("Número de puntos (n)", fontsize=12)
-    ax.set_ylabel("Tiempo medio de ejecución (s)", fontsize=12)
-    ax.set_title("RDP: Tiempo de ejecución vs n — comparación de ε", fontsize=13)
-    ax.set_xscale("log")
+    resumen_path = try_dir / "resumen.csv"
+    _escribir_resumen(df, resumen_path)
 
-    # Eje X: ticks en todos los n reales, con labels legibles
-    ax.set_xticks(TAMANOS)
-    ax.set_xticklabels([f"{n:,}".replace(",", ".") for n in TAMANOS])  # 1.000, 5.000, etc.
-    ax.xaxis.set_minor_locator(mticker.NullLocator())  # sin ticks menores
-
-    # Grid solo en ticks mayores
-    ax.grid(True, which="major", ls=":", alpha=0.5, axis="both")
-    ax.set_axisbelow(True)
-
-    ax.legend(fontsize=11, title="Tolerancia ε", title_fontsize=11)
-    fig.tight_layout()
-
-    out_path = graficos_dir / "T_vs_n_comparativo_eps.png"
-    fig.savefig(out_path, dpi=200)
-    plt.close(fig)
-
-    print(f"✓ Gráfico generado: {out_path}")
+    print(f"✓ Gráficos generados en {graficos_dir}")
+    print(f"✓ Tabla resumen: {resumen_path}")
 
 
 if __name__ == "__main__":
