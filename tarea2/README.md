@@ -67,7 +67,8 @@ tarea2/
 ```bash
 python src/run.py --test     # 11 [PASS], exit 0
 python src/run.py --complejidad
-python src/run.py            # crea data/try_N/ con CSV, resumen y 3 gráficos
+
+python src/run.py (metodo principal para correr el programa)           # crea data/try_N/ con CSV, resumen y 3 gráficos
 ```
 
 Comprobar el CSV generado:
