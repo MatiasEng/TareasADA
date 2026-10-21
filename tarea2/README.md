@@ -142,7 +142,7 @@ Instrumenta el algoritmo para contar **evaluaciones punto-segmento** y
 
 Salidas: `data/complejidad.csv` y `data/complejidad.png` (log-log).
 
-### 5. Generar trayectorias sintéticas
+### 5. Generar trayectorias sintéticas (opcional)
 
 ```bash
 python src/generar_trayectorias.py            # no sobrescribe archivos existentes
@@ -150,9 +150,9 @@ python src/generar_trayectorias.py --force    # sobrescribe
 ```
 
 - Llena `puntos/trayectoria_1000.txt` … `trayectoria_50000.txt`.
-- Reemplazar por los archivos oficiales del curso cuando estén disponibles.
-- Por seguridad **omite archivos existentes** salvo que se use `--force`
-  (evita borrar trayectorias oficiales por accidente).
+- **No es necesario** si ya están las trayectorias oficiales (`.csv`).
+- Por seguridad **omite archivos existentes** y **aborta si hay `.csv`**
+  salvo que se use `--force` (evita mezclar/borrar las oficiales).
 
 ### 6. Workflow unificado
 
@@ -198,8 +198,13 @@ MAX_SAMPLES = 10     # límite anti-sobrecarga
 
 ## Notas
 
-- `puntos/` contiene trayectorias de entrada. Si no hay archivos, los
-  experimentos usan el generador sintético como respaldo.
+- `puntos/` contiene las **trayectorias oficiales** del curso:
+  `trayectoria_500.csv`, `trayectoria_1000.csv`, `trayectoria_5000.csv`,
+  `trayectoria_10000.csv`, `trayectoria_30000.csv` y `trayectoria_50000.csv`
+  (formato `x,y` con encabezado y CRLF). Los tamaños se detectan
+  automáticamente (no hay 20000 en el set oficial).
+- Si `puntos/` no tiene archivos, los experimentos usan el generador sintético
+  como respaldo.
 - `data/` acumula `try_1/`, `try_2/`, … Solo los `try_N` generados con la
   versión actual del código son comparables entre sí (cambios en la métrica,
   formato o semillas invalidan los anteriores).

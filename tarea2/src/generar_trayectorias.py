@@ -22,6 +22,7 @@ def guardar(puntos, ruta: str) -> None:
 
 
 if __name__ == "__main__":
+    import glob
     import os
     import sys
 
@@ -30,6 +31,16 @@ if __name__ == "__main__":
     TAMANOS = [1000, 5000, 10000, 20000, 30000, 50000]
     forzar = "--force" in sys.argv[1:]
     os.makedirs(PUNTOS_DIR, exist_ok=True)
+
+    # Evitar mezclar sintéticas (.txt) con las trayectorias oficiales (.csv)
+    oficiales = glob.glob(os.path.join(PUNTOS_DIR, "*.csv"))
+    if oficiales and not forzar:
+        raise SystemExit(
+            f"puntos/ contiene {len(oficiales)} archivo(s) .csv (¿oficiales?).\n"
+            "Se aborta para no mezclar sintéticas con oficiales.\n"
+            "Usa --force si realmente quieres generarlas igualmente."
+        )
+
     for tamano in TAMANOS:
         ruta = os.path.join(PUNTOS_DIR, f"trayectoria_{tamano}.txt")
         if os.path.exists(ruta) and not forzar:
