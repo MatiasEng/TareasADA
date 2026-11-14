@@ -6,6 +6,7 @@ V1: fuerza bruta por subconjuntos vs. ramificación acotada (FPT) con poda
     por cota inferior de emparejamiento.
 V2: búsqueda del óptimo (incremental sobre V1) vs. fuerza bruta 2^n.
 """
+
 from __future__ import annotations
 
 import itertools
@@ -54,9 +55,7 @@ def cota_inferior_emparejamiento(aristas: Sequence[Arista], C: Iterable[int]) ->
 
 
 # ---------- V1: fuerza bruta ----------
-def v1_fuerza_bruta(
-    n: int, aristas: Sequence[Arista], k: int
-) -> list[int] | None:
+def v1_fuerza_bruta(n: int, aristas: Sequence[Arista], k: int) -> list[int] | None:
     """Prueba los C(n,k) subconjuntos de tamaño k. O(C(n,k) * m)."""
     if k < 0 or k > n:
         return None
@@ -94,9 +93,7 @@ def _ramificar(aristas: Sequence[Arista], k: int, C: set[int]) -> set[int] | Non
     return None
 
 
-def v1_ramificacion(
-    n: int, aristas: Sequence[Arista], k: int
-) -> list[int] | None:
+def v1_ramificacion(n: int, aristas: Sequence[Arista], k: int) -> list[int] | None:
     """Cobertura de tamaño EXACTAMENTE k o None. O(2^k * m)."""
     if k < 0 or k > n:
         return None
@@ -183,7 +180,7 @@ def experimento_v1(n: int = 18, p: float = 0.3, repeticiones: int = 5) -> None:
     print("\n=== V1: fuerza bruta vs ramificación (n fijo, k variable) ===")
     print(f"{'k':>3} {'bruta(s)':>10} {'ramif(s)':>10} {'¿existe?':>9}", flush=True)
     # Mismo conjunto de grafos para todos los k: así la columna ¿existe? es
-    # monótona y las comparaciones entre filas son sobre los mismos instancias.
+    # monótona y las comparaciones entre filas son sobre las mismos instancias.
     grafos = [generar_grafo(n, p, seed=7 * r + 1) for r in range(repeticiones)]
     for k in range(1, n):
         tb = tr = 0.0
@@ -206,9 +203,9 @@ def experimento_v1(n: int = 18, p: float = 0.3, repeticiones: int = 5) -> None:
 
 if __name__ == "__main__":
     # Ejemplo pequeño (AJUSTA las aristas a las de tu Figura 1,
-    # vértices numerados desde 0). Aquí: 1-5, 2-5, 3-6, 4-6, 5-6 -> {5,6}
+    # vértices numerados desde 0). Aquí: 1-5, 1-6, 2-6, 3-5, 3-6, 4-5, 5-6 -> {5,6}
     n_ej = 7
-    ar_ej = [(1, 5), (2, 5), (3, 6), (4, 6), (5, 6)]
+    ar_ej = [(1, 5), (1, 6), (2, 6), (3, 5), (3, 6), (4, 5), (5, 6)]
     print("V1 k=2:", v1_ramificacion(n_ej, ar_ej, 2))
     print("V2    :", v2_incremental(n_ej, ar_ej))
     print()
